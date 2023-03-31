@@ -25,9 +25,10 @@
   <body bgcolor="white" height="100%" width="100%"> 
     <div id="debug"></div>
     <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
-
     <script>
       // Fix me
+
+
 var canvas = document.getElementById('c');
 var host = window.location.host;
 var context = canvas.getContext("2d");
@@ -35,6 +36,7 @@ var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
 var wscounter = 0;
 var socket;
+
 
 function debug(str) {
     var debugDiv = document.getElementById('debug');
@@ -45,17 +47,33 @@ debug("Test");
 world = {};
 
 //XXX: TODO Make this prettier!
+/* Reused my code from Assignment 4
+Resource used last time: https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Drawing_shapes
+License (for code below ):  Apache 2 license by Abram Hindle and Krizzia Concepcion
+*/
 function drawCircle(context,entity) {
     with(context) {
-        beginPath();                
+        beginPath();              
         lineWidth = 3;
         var x = entity["x"];
         var y = entity["y"];
         //moveTo(x,y);
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
-        stroke();                                
+        arc(x, y, 30, 0, 2.0 * Math.PI, false);  
+        stroke();
+        
+        beginPath();
+        arc(x-7, y-10, 5, 0, Math.PI * 2, true); // Right eye
+        stroke();   
+        
+        beginPath();
+        arc(x+10, y-10, 5, 0, Math.PI * 2, true); // Left eye
+        stroke();
+
+        beginPath();
+        arc(x+5, y+10, 9,0 , Math.PI, false); // Mouth 
+        stroke();                   
     }
 }
 
@@ -72,7 +90,7 @@ function prepEntity(entity) {
 function clearFrame() {
     with(context) {
 	moveTo(0,0);
-	fillStyle = "#000";
+	fillStyle = "#ffe085";
 	fillRect(0,0,W,H);
     }
 
@@ -120,11 +138,22 @@ function getPosition(e) {
 		return [x,y];
 	}
 }
-
+/*
+Resource used: https://stackoverflow.com/questions/11805130/socket-io-how-to-send-javascript-object
+Asked by (aug. 4, 2012): https://stackoverflow.com/users/1575438/zsd
+Response by (oct. 16,2012): https://stackoverflow.com/users/1295200/salipropham
+License:  CC BY-SA 3.0
+*/
 function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
+ 
+    //turn the dictionary to a json(sending the proper format)
+    //needs to send format as {entity:data}
+    let properJson = {[entity]:data}
+    let jsonWorld = JSON.stringify(properJson)
+    socket.send(jsonWorld)
 }
 var counter = 0;
 function addEntityWithoutName(data) {
@@ -235,12 +264,21 @@ mouse.mousedowners.push(function(x,y,clicked,e) {
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x,'y':y,'colour':'lightgreen'});
 });
 
+
+//used code from last assignment to modify colour (resource used listed below)
+/*
+   Source used: https://css-tricks.com/snippets/javascript/random-hex-color/
+   Author: Chris Coyier
+   Published on: Dec 10,2009 (edited on Feb 19,2020)
+   License not found
+*/
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    var colour = Math.floor(Math.random()*16777215).toString(16);
+    addEntityWithoutName({'x':x,'y':y,'colour':`#${colour}`,
+                          });
 });
 
 
@@ -254,6 +292,10 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
+
+        //get the canvas and world
+        drawFrame()
+        
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -261,7 +303,17 @@ function wsSetup() {
     socket.onmessage = function(msg) {  
         try {
             debug("WebSocket Recv:" + msg.data);
-            //XXX: TODO What are you going to do here?            
+            //XXX: TODO What are you going to do here?    
+            //get the data then turn it into an entity object so I can update the world?
+            data = JSON.parse(msg.data)
+        
+            //add the entity data to the world
+            for(let i in data){
+                world[i] = data[i]
+            }
+            
+            drawNextFrame();
+            update();
         } catch (e) {
             alert("socket on message: " + e);
         }
